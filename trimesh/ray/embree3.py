@@ -272,12 +272,10 @@ class _EmbreeWrap(object):
     """
 
     def __init__(self, vertices, faces, scale):
-        # TODO: figure out why scaling is not working in embree3
-        # scaled = np.array(vertices, dtype=np.float64)
-        # self.origin = scaled.min(axis=0)
-        # self.scale = float(scale)
-        # scaled = (scaled - self.origin) * self.scale
-        scaled = vertices
+        scaled = np.array(vertices, dtype=np.float64)
+        self.origin = scaled.min(axis=0)
+        self.scale = float(scale)
+        scaled = (scaled - self.origin) * self.scale
 
         device = embree.Device()
         geometry = device.make_geometry(embree.GeometryType.Triangle)
@@ -290,7 +288,7 @@ class _EmbreeWrap(object):
             3*np.dtype('float32').itemsize,  # byte_stride
             vertices.shape[0],  # item_count
         )
-        vertex_buffer[:] = vertices[:].astype(np.float32)
+        vertex_buffer[:] = scaled[:].astype(np.float32)
         index_buffer = geometry.set_new_buffer(
             embree.BufferType.Index,  # buf_type
             0,  # slot
@@ -307,9 +305,7 @@ class _EmbreeWrap(object):
         self.scene = scene
 
     def run(self, origins, normals, **kwargs):
-        # TODO: figure out why scaling is not working in embree3
-        # scaled = (np.array(origins, dtype=np.float64) - self.origin) * self.scale
-        scaled = origins
+        scaled = (np.array(origins, dtype=np.float64) - self.origin) * self.scale
 
         m = origins.shape[0]
 
