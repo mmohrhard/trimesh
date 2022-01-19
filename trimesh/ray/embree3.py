@@ -2,14 +2,25 @@
 Ray queries using the pyembree package with the
 API wrapped to match our native raytracer.
 """
-from . import parent
-
 import numpy as np
 
-# bindings for embree3
-import embree
+from copy import deepcopy
 
-raise ValueError('nah')
+import embree
+from . import parent
+
+from .. import util
+from .. import caching
+from .. import intersections
+
+from .util import contains_points
+from ..constants import log_time
+
+# the factor of geometry.scale to offset a ray from a triangle
+# to reliably not hit its origin triangle
+_offset_factor = 1e-4
+# we want to clip our offset to a sane distance
+_offset_floor = 1e-8
 
 
 class RayMeshIntersector(parent.RayMeshParent):
@@ -30,6 +41,8 @@ class RayMeshIntersector(parent.RayMeshParent):
           large or small meshes.
         """
         self.mesh = geometry
+        self._scale_to_box = False # scale_to_box
+        self._cache = caching.Cache(id_function=self.mesh.crc)
 
     @property
     def _scale(self):
@@ -43,6 +56,18 @@ class RayMeshIntersector(parent.RayMeshParent):
         else:
             scale = 1.0
         return scale
+
+    @caching.cache_decorator
+    def _scene(self):
+        """Set up an Embree scene. This function allocates some memory that
+        Embree manages, and loads vertices and index lists for the
+        faces. In Embree parlance, this function creates a "device",
+        which manages a "scene", which has one "geometry" in it, which
+        is our mesh.
+        """
+        return _EmbreeWrap(vertices=self.mesh.vertices,
+                           faces=self.mesh.faces,
+                           scale=self._scale)
 
     def intersects_location(self,
                             origins,
@@ -59,6 +84,7 @@ class RayMeshIntersector(parent.RayMeshParent):
 
         return locations, index_ray, index_tri
 
+    @log_time
     def intersects_id(self,
                       origins,
                       directions,
@@ -80,7 +106,7 @@ class RayMeshIntersector(parent.RayMeshParent):
         result_locations = []
 
         # the mask for which rays are still active
-        current = np.ones(len(origins), dtype=np.bool)
+        current = np.ones(len(origins), dtype=bool)
 
         if multiple_hits or return_locations:
             # how much to offset ray to transport to the other side of face
@@ -167,6 +193,7 @@ class RayMeshIntersector(parent.RayMeshParent):
             return index_tri, index_ray, locations
         return index_tri, index_ray
 
+    @log_time
     def intersects_first(self,
                          origins,
                          directions):
@@ -187,11 +214,8 @@ class RayMeshIntersector(parent.RayMeshParent):
           Index of triangle ray hit, or -1 if not hit
         """
 
-        origins = np.asanyarray(origins)
+        origins = np.asanyarray(deepcopy(origins))
         directions = np.asanyarray(directions)
-
-        from IPython import embed
-        embed()
 
         triangle_index = self._scene.run(origins,
                                          directions)
@@ -238,3 +262,68 @@ class RayMeshIntersector(parent.RayMeshParent):
                          Whether point is inside mesh or not
         """
         return contains_points(self, points)
+
+
+class _EmbreeWrap(object):
+    """
+    A light wrapper for PyEmbree scene objects which
+    allows queries to be scaled to help with precision
+    issues, as well as selecting the correct dtypes.
+    """
+
+    def __init__(self, vertices, faces, scale):
+        # TODO: figure out why scaling is not working in embree3
+        # scaled = np.array(vertices, dtype=np.float64)
+        # self.origin = scaled.min(axis=0)
+        # self.scale = float(scale)
+        # scaled = (scaled - self.origin) * self.scale
+        scaled = vertices
+
+        device = embree.Device()
+        geometry = device.make_geometry(embree.GeometryType.Triangle)
+        scene = device.make_scene()
+        scene.set_flags(4)
+        vertex_buffer = geometry.set_new_buffer(
+            embree.BufferType.Vertex, # buf_type
+            0, # slot
+            embree.Format.Float3, # fmt
+            3*np.dtype('float32').itemsize, # byte_stride
+            vertices.shape[0], # item_count
+        )
+        vertex_buffer[:] = vertices[:].astype(np.float32)
+        index_buffer = geometry.set_new_buffer(
+            embree.BufferType.Index, # buf_type
+            0, # slot
+            embree.Format.Uint3, # fmt
+            3*np.dtype('uint32').itemsize, # byte_stride,
+            faces.shape[0]
+        )
+        index_buffer[:] = faces[:].astype(np.uint32)
+        geometry.commit()
+        scene.attach_geometry(geometry)
+        geometry.release()
+        scene.commit()
+
+        self.scene = scene
+
+    def run(self, origins, normals, **kwargs):
+        # TODO: figure out why scaling is not working in embree3
+        # scaled = (np.array(origins, dtype=np.float64) - self.origin) * self.scale
+        scaled = origins
+
+        m = origins.shape[0]
+
+        rayhit = embree.RayHit1M(m)
+        context = embree.IntersectContext()
+        rayhit.org[:] = scaled.astype(np.float32)
+        rayhit.dir[:] = normals.astype(np.float32)
+        rayhit.tnear[:] = 0
+        rayhit.tfar[:] = 1e37
+        rayhit.flags[:] = 0
+        rayhit.geom_id[:] = embree.INVALID_GEOMETRY_ID
+
+        self.scene.intersect1M(context, rayhit)
+
+        I = rayhit.prim_id.copy().astype(np.intp)
+        I[rayhit.geom_id == embree.INVALID_GEOMETRY_ID] = -1
+        return I
