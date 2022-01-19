@@ -285,7 +285,7 @@ class _EmbreeWrap(object):
             embree.BufferType.Vertex,  # buf_type
             0,  # slot
             embree.Format.Float3,  # fmt
-            3*np.dtype('float32').itemsize,  # byte_stride
+            3 * np.dtype('float32').itemsize,  # byte_stride
             vertices.shape[0],  # item_count
         )
         vertex_buffer[:] = scaled[:].astype(np.float32)
@@ -293,7 +293,7 @@ class _EmbreeWrap(object):
             embree.BufferType.Index,  # buf_type
             0,  # slot
             embree.Format.Uint3,  # fmt
-            3*np.dtype('uint32').itemsize,  # byte_stride,
+            3 * np.dtype('uint32').itemsize,  # byte_stride,
             faces.shape[0]
         )
         index_buffer[:] = faces[:].astype(np.uint32)
