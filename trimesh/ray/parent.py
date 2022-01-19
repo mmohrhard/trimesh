@@ -153,20 +153,20 @@ def _kwarg_deprecated(function):
         if 'ray_origins' in kwargs:
             log.warning(
                 "Deprecation! The `ray_origins` kwarg for "
-                "*all ray operations* has been renamed to `origins`. "
-                "Versions of trimesh released after September 2021 "
-                "will not include this warning and calls will fail if "
-                "you don't rename your kwargs! "
-                "Called from: `{}`.".format(function.__name__))
+                + "*all ray operations* has been renamed to `origins`. "
+                + "Versions of trimesh released after September 2021 "
+                + "will not include this warning and calls will fail if "
+                + "you don't rename your kwargs! "
+                + "Called from: `{}`.".format(function.__name__))
             kwargs['origins'] = kwargs.pop('ray_origins')
         if 'ray_directions' in kwargs:
             log.warning(
                 "Deprecation! The `ray_directions` kwarg for "
-                "*all ray operations* has been renamed to `directions`. "
-                "Versions of trimesh released after September 2021 "
-                "will not include this warning and will fail if "
-                "you don't rename your kwargs! "
-                "Called from `{}`.".format(function.__name__))
+                + "*all ray operations* has been renamed to `directions`. "
+                + "Versions of trimesh released after September 2021 "
+                + "will not include this warning and will fail if "
+                + "you don't rename your kwargs! "
+                + "Called from `{}`.".format(function.__name__))
             kwargs['directions'] = kwargs.pop('ray_directions')
         # value not in cache so execute the function
         return function(*args, **kwargs)
