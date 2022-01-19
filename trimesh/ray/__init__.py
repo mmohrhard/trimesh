@@ -11,13 +11,13 @@ engines = deque([basic.RayMeshIntersector])
 try:
     from . import embree2
     engines.appendleft(embree2.RayMeshIntersector)
-except BaseException as E:
+except BaseException:
     log.debug('no embree2', exc_info=True)
 
 try:
     from . import embree3
     engines.appendleft(embree3.RayMeshIntersector)
-except BaseException as E:
+except BaseException:
     log.debug('no embree3', exc_info=True)
 
 # add to __all__ as per pep8

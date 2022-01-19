@@ -41,7 +41,7 @@ class RayMeshIntersector(parent.RayMeshParent):
           large or small meshes.
         """
         self.mesh = geometry
-        self._scale_to_box = False # scale_to_box
+        self._scale_to_box = False  # scale_to_box
         self._cache = caching.Cache(id_function=self.mesh.crc)
 
     @property
@@ -123,7 +123,7 @@ class RayMeshIntersector(parent.RayMeshParent):
         # if a ray is offset from a triangle and then is reported
         # hitting itself this could get stuck on that one triangle
         for query_depth in range(max_hits):
-            # run the pyembree query
+            # run the embree query
             # if you set output=1 it will calculate distance along
             # ray, which is bizzarely slower than our calculation
             query = self._scene.run(
@@ -284,18 +284,18 @@ class _EmbreeWrap(object):
         scene = device.make_scene()
         scene.set_flags(4)
         vertex_buffer = geometry.set_new_buffer(
-            embree.BufferType.Vertex, # buf_type
-            0, # slot
-            embree.Format.Float3, # fmt
-            3*np.dtype('float32').itemsize, # byte_stride
-            vertices.shape[0], # item_count
+            embree.BufferType.Vertex,  # buf_type
+            0,  # slot
+            embree.Format.Float3,  # fmt
+            3*np.dtype('float32').itemsize,  # byte_stride
+            vertices.shape[0],  # item_count
         )
         vertex_buffer[:] = vertices[:].astype(np.float32)
         index_buffer = geometry.set_new_buffer(
-            embree.BufferType.Index, # buf_type
-            0, # slot
-            embree.Format.Uint3, # fmt
-            3*np.dtype('uint32').itemsize, # byte_stride,
+            embree.BufferType.Index,  # buf_type
+            0,  # slot
+            embree.Format.Uint3,  # fmt
+            3*np.dtype('uint32').itemsize,  # byte_stride,
             faces.shape[0]
         )
         index_buffer[:] = faces[:].astype(np.uint32)
@@ -324,6 +324,6 @@ class _EmbreeWrap(object):
 
         self.scene.intersect1M(context, rayhit)
 
-        I = rayhit.prim_id.copy().astype(np.intp)
-        I[rayhit.geom_id == embree.INVALID_GEOMETRY_ID] = -1
-        return I
+        intersects = rayhit.prim_id.copy().astype(np.intp)
+        intersects[rayhit.geom_id == embree.INVALID_GEOMETRY_ID] = -1
+        return intersects
